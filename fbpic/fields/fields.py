@@ -313,7 +313,7 @@ class Fields(object) :
         ---------
         fieldtype :
             A string which represents the kind of field to transform
-            (either 'E', 'B', 'J', 'rho_next', 'rho_prev')
+            (either 'E', 'B', 'J', 'rho_next', 'rho_prev’, ‘A’)
         """
         # Use the appropriate transformation depending on the fieldtype.
         if fieldtype == 'E' :
@@ -346,6 +346,11 @@ class Fields(object) :
                 spectral_rho = getattr( self.spect[m], fieldtype )
                 self.trans[m].interp2spect_scal(
                     self.interp[m].rho, spectral_rho )
+        elif fieldtype == 'A':
+            # Transform each azimuthal grid individually
+            for m in range(self.Nm) :
+                self.trans[m].interp2spect_scal(
+                    self.interp[m].A, self.spect[m].A )
         else:
             raise ValueError( 'Invalid string for fieldtype: %s' %fieldtype )
 
@@ -358,7 +363,7 @@ class Fields(object) :
         ---------
         fieldtype :
             A string which represents the kind of field to transform
-            (either 'E', 'B', 'J', 'rho_next', 'rho_prev')
+            (either 'E', 'B', 'J', 'rho_next', 'rho_prev’, ‘A’)
         """
         # Use the appropriate transformation depending on the fieldtype.
         if fieldtype == 'E' :
@@ -395,6 +400,11 @@ class Fields(object) :
             for m in range(self.Nm) :
                 self.trans[m].spect2interp_scal(
                     self.spect[m].rho_prev, self.interp[m].rho )
+        elif fieldtype == 'A' :
+            # Transform each azimuthal grid individually
+            for m in range(self.Nm) :
+                self.trans[m].spect2interp_scal(
+                    self.spect[m].A, self.interp[m].A )
         else :
             raise ValueError( 'Invalid string for fieldtype: %s' %fieldtype )
 
@@ -415,7 +425,7 @@ class Fields(object) :
         ---------
         fieldtype :
             A string which represents the kind of field to transform
-            (either 'E', 'B', 'J', 'rho_next', 'rho_prev')
+            (either 'E', 'B', 'J', 'rho_next', 'rho_prev’, ‘A’)
         """
         # Use the appropriate transformation depending on the fieldtype.
         if fieldtype == 'E' :
@@ -450,6 +460,10 @@ class Fields(object) :
             for m in range(self.Nm) :
                 self.trans[m].fft.inverse_transform(
                     self.spect[m].rho_prev, self.interp[m].rho )
+        elif fieldtype == 'A' :
+            for m in range(self.Nm) :
+                self.trans[m].fft.inverse_transform(
+                    self.spect[m].A, self.interp[m].A )
         else :
             raise ValueError( 'Invalid string for fieldtype: %s' %fieldtype )
 
@@ -467,7 +481,7 @@ class Fields(object) :
         ---------
         fieldtype :
             A string which represents the kind of field to transform
-            (either 'E', 'B', 'J', 'rho_next', 'rho_prev')
+            (either 'E', 'B', 'J', 'rho_next', 'rho_prev’, ‘A’)
         """
         # Use the appropriate transformation depending on the fieldtype.
         if fieldtype == 'E' :
@@ -502,6 +516,10 @@ class Fields(object) :
             for m in range(self.Nm) :
                 self.trans[m].fft.transform(
                     self.interp[m].rho, self.spect[m].rho_prev )
+        elif fieldtype == 'A' :
+            for m in range(self.Nm) :
+                self.trans[m].fft.transform(
+                    self.interp[m].A, self.spect[m].A )
         else :
             raise ValueError( 'Invalid string for fieldtype: %s' %fieldtype )
 
@@ -517,7 +535,7 @@ class Fields(object) :
         ---------
         fieldtype : string
             A string which represents the kind of field to be erased
-            (either 'E', 'B', 'J', 'rho')
+            (either 'E', 'B', 'J', 'rho' or ‘A’)
         """
         if self.use_cuda :
             # Obtain the cuda grid
@@ -565,6 +583,9 @@ class Fields(object) :
                     self.interp[m].Br[:,:] = 0.
                     self.interp[m].Bt[:,:] = 0.
                     self.interp[m].Bz[:,:] = 0.
+            elif fieldtype == 'A' :
+                for m in range(self.Nm) :
+                    self.interp[m].A[:,:] = 0.
             else :
                 raise ValueError('Invalid string for fieldtype: %s'%fieldtype)
 
@@ -607,7 +628,7 @@ class Fields(object) :
         ---------
         fieldtype : string
             A string which represents the kind of field to be filtered
-            (either 'E', 'B', 'J', 'rho_next' or 'rho_prev')
+            (either 'E', 'B', 'J', 'rho_next’, ‘rho_prev' or ‘A’)
         """
         for m in range(self.Nm) :
             self.spect[m].filter( fieldtype )
@@ -665,7 +686,7 @@ class InterpolationGrid(object) :
 
     Main attributes :
     - z,r : 1darrays containing the positions of the grid
-    - Er, Et, Ez, Br, Bt, Bz, Jr, Jt, Jz, rho :
+    - Er, Et, Ez, Br, Bt, Bz, Jr, Jt, Jz, rho, A :
       2darrays containing the fields.
     """
 
@@ -723,6 +744,7 @@ class InterpolationGrid(object) :
         self.Jt = np.zeros( (Nz, Nr), dtype='complex' )
         self.Jz = np.zeros( (Nz, Nr), dtype='complex' )
         self.rho = np.zeros( (Nz, Nr), dtype='complex' )
+        self.A  = np.zeros( (Nz, Nr), dtype='complex' )
 
         # Check whether the GPU should be used
         self.use_cuda = use_cuda
@@ -758,6 +780,7 @@ class InterpolationGrid(object) :
         self.Jt = cuda.to_device( self.Jt )
         self.Jz = cuda.to_device( self.Jz )
         self.rho = cuda.to_device( self.rho )
+        #Should add something for A
 
     def receive_fields_from_gpu( self ):
         """
@@ -776,6 +799,7 @@ class InterpolationGrid(object) :
         self.Jt = self.Jt.copy_to_host()
         self.Jz = self.Jz.copy_to_host()
         self.rho = self.rho.copy_to_host()
+        #Should add something for A
 
 
 class SpectralGrid(object) :
@@ -837,6 +861,8 @@ class SpectralGrid(object) :
         if current_correction == 'cross-deposition':
             self.rho_next_z = np.zeros( (Nz, Nr), dtype='complex' )
             self.rho_next_xy = np.zeros( (Nz, Nr), dtype='complex' )
+        self.A  = np.zeros( (Nz, Nr), dtype='complex' )
+        self.dtA  = np.zeros( (Nz, Nr), dtype='complex' )
 
         # Auxiliary arrays
         # - for the field solve
@@ -890,6 +916,7 @@ class SpectralGrid(object) :
         if hasattr( self, 'rho_next_z' ):
             self.rho_next_z = cuda.to_device( self.rho_next_z )
             self.rho_next_xy = cuda.to_device( self.rho_next_xy )
+        #Should add something for A
 
 
     def receive_fields_from_gpu( self ):
@@ -914,6 +941,7 @@ class SpectralGrid(object) :
         if hasattr( self, 'rho_next_z' ):
             self.rho_next_z = self.rho_next_z.copy_to_host()
             self.rho_next_xy = self.rho_next_xy.copy_to_host()
+        #Should add something for A
 
 
     def correct_currents (self, dt, ps, current_correction ):
@@ -1083,7 +1111,7 @@ class SpectralGrid(object) :
                 numba_push_eb_standard(
                     self.Ep, self.Em, self.Ez, self.Bp, self.Bm, self.Bz,
                     self.Jp, self.Jm, self.Jz, self.rho_prev, self.rho_next,
-                    ps.rho_prev_coef, ps.rho_next_coef, ps.j_coef,
+                    self.A, self.dtA, ps.rho_prev_coef, ps.rho_next_coef, ps.j_coef,
                     ps.C, ps.S_w, self.kr, self.kz, ps.dt,
                     use_true_rho, self.Nz, self.Nr )
             else:
@@ -1091,7 +1119,7 @@ class SpectralGrid(object) :
                 numba_push_eb_comoving(
                     self.Ep, self.Em, self.Ez, self.Bp, self.Bm, self.Bz,
                     self.Jp, self.Jm, self.Jz, self.rho_prev, self.rho_next,
-                    ps.rho_prev_coef, ps.rho_next_coef, ps.j_coef,
+                    self.A, self.dtA, ps.rho_prev_coef, ps.rho_next_coef, ps.j_coef,
                     ps.C, ps.S_w, ps.T_eb, ps.T_cc, ps.T_rho,
                     self.kr, self.kz, ps.dt, ps.V,
                     use_true_rho, self.Nz, self.Nr )
@@ -1160,6 +1188,9 @@ class SpectralGrid(object) :
                                 'rho_next_z', 'rho_next_xy']:
                 spectral_rho = getattr( self, fieldtype )
                 spectral_rho *= self.filter_array
+            elif fieldtype == 'A':
+                self.A = self.A * self.filter_array
+                self.dtA = self.dtA * self.filter_array
             else :
                 raise ValueError('Invalid string for fieldtype: %s'%fieldtype)
 
