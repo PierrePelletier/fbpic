@@ -10,6 +10,7 @@ import numpy as np
 from scipy.constants import c, mu_0, epsilon_0
 from fbpic.utils.threading import nthreads
 from .numba_methods import numba_push_eb_standard, numba_push_eb_comoving, \
+    numba_push_envelope_standard, \
     numba_correct_currents_curlfree_standard, \
     numba_correct_currents_crossdeposition_standard, \
     numba_correct_currents_curlfree_comoving, \
@@ -267,6 +268,13 @@ class Fields(object) :
         # corresponding psatd coefficients
         for m in range(self.Nm) :
             self.spect[m].push_eb_with( self.psatd[m], use_true_rho )
+            
+            # Placeholder for determining if one should use the envelope model
+            use_envelope_model_bool = True
+            if (use_envelope_model_bool):
+                self.spect[m].push_envelope_with(self.psatd[m])
+            
+            
             self.spect[m].push_rho()
 
     def correct_currents(self, check_exchanges=False) :
@@ -351,6 +359,8 @@ class Fields(object) :
             for m in range(self.Nm) :
                 self.trans[m].interp2spect_scal(
                     self.interp[m].A, self.spect[m].A )
+                self.trans[m].interp2spect_scal(
+                    self.interp[m].dtA, self.spect[m].dtA )
         else:
             raise ValueError( 'Invalid string for fieldtype: %s' %fieldtype )
 
@@ -405,6 +415,8 @@ class Fields(object) :
             for m in range(self.Nm) :
                 self.trans[m].spect2interp_scal(
                     self.spect[m].A, self.interp[m].A )
+                self.trans[m].spect2interp_scal(
+                    self.spect[m].dtA, self.interp[m].dtA )    
         else :
             raise ValueError( 'Invalid string for fieldtype: %s' %fieldtype )
 
@@ -464,6 +476,8 @@ class Fields(object) :
             for m in range(self.Nm) :
                 self.trans[m].fft.inverse_transform(
                     self.spect[m].A, self.interp[m].A )
+                self.trans[m].fft.inverse_transform(
+                    self.spect[m].dtA, self.interp[m].dtA )
         else :
             raise ValueError( 'Invalid string for fieldtype: %s' %fieldtype )
 
@@ -520,6 +534,8 @@ class Fields(object) :
             for m in range(self.Nm) :
                 self.trans[m].fft.transform(
                     self.interp[m].A, self.spect[m].A )
+                self.trans[m].fft.transform(
+                    self.interp[m].dtA, self.spect[m].dtA )
         else :
             raise ValueError( 'Invalid string for fieldtype: %s' %fieldtype )
 
@@ -586,6 +602,7 @@ class Fields(object) :
             elif fieldtype == 'A' :
                 for m in range(self.Nm) :
                     self.interp[m].A[:,:] = 0.
+                    self.interp[m].dtA[:,:] = 0.
             else :
                 raise ValueError('Invalid string for fieldtype: %s'%fieldtype)
 
@@ -745,6 +762,8 @@ class InterpolationGrid(object) :
         self.Jz = np.zeros( (Nz, Nr), dtype='complex' )
         self.rho = np.zeros( (Nz, Nr), dtype='complex' )
         self.A  = np.zeros( (Nz, Nr), dtype='complex' )
+        self.dtA = np.zeros( (Nz, Nr), dtype='complex' )
+        
 
         # Check whether the GPU should be used
         self.use_cuda = use_cuda
@@ -1111,7 +1130,7 @@ class SpectralGrid(object) :
                 numba_push_eb_standard(
                     self.Ep, self.Em, self.Ez, self.Bp, self.Bm, self.Bz,
                     self.Jp, self.Jm, self.Jz, self.rho_prev, self.rho_next,
-                    self.A, self.dtA, ps.rho_prev_coef, ps.rho_next_coef, ps.j_coef,
+                    ps.rho_prev_coef, ps.rho_next_coef, ps.j_coef,
                     ps.C, ps.S_w, self.kr, self.kz, ps.dt,
                     use_true_rho, self.Nz, self.Nr )
             else:
@@ -1119,10 +1138,30 @@ class SpectralGrid(object) :
                 numba_push_eb_comoving(
                     self.Ep, self.Em, self.Ez, self.Bp, self.Bm, self.Bz,
                     self.Jp, self.Jm, self.Jz, self.rho_prev, self.rho_next,
-                    self.A, self.dtA, ps.rho_prev_coef, ps.rho_next_coef, ps.j_coef,
+                    ps.rho_prev_coef, ps.rho_next_coef, ps.j_coef,
                     ps.C, ps.S_w, ps.T_eb, ps.T_cc, ps.T_rho,
                     self.kr, self.kz, ps.dt, ps.V,
                     use_true_rho, self.Nz, self.Nr )
+                    
+                    
+    def push_envelope_with(self, ps):
+        
+        """
+        Push the A and dtA envelope fields over one timestep, using the psatd coefficients.
+        
+        WARNING: currently only implemented for non-comoving simulations, with only CPU usage
+
+        Parameters
+        ----------
+        ps : PsatdCoeffs object
+            psatd object corresponding to the same m mode
+
+        """
+        assert (ps.V is None or ps.V == 0)
+        
+        numba_push_envelope_standard(self.A, self.dtA, ps.w2_square, ps.invw_tot, ps.S_env,
+                                 ps.C_env, ps.sinc_env, ps.A_coef, self.Nz, self.Nr)
+        
 
     def push_rho(self) :
         """
@@ -1344,6 +1383,17 @@ class PsatdCoeffs(object) :
             self.rho_next_coef = c**2/epsilon_0*(xi_2)
         # Enforce the right value for w==0
         self.rho_next_coef[ w==0 ] = c**2/epsilon_0*(1./6*dt**2)
+        
+        #Calculate coefficients for pushing the envelope of A
+        
+        w_laser = 2*c*np.pi/ (0.8e-6)
+        self.w2_square = c**2*(kr**2 + kz**2 + 2 * kz * w_laser/c)
+        w_tot = np.sqrt(w_laser**2 + self.w2_square)
+        self.invw_tot = np.where(w_tot == 0, 1, 1./w_tot)
+        self.S_env, self.C_env = np.sin(w_tot*dt), np.cos(w_tot*dt)
+        self.sinc_env = 1j * w_laser * self.invw_tot * self.S_env
+        self.A_coef = np.exp(-1j * w_laser * dt)
+        self.A_coef = 1
 
         # Replace these array by arrays on the GPU, when using cuda
         if use_cuda:
