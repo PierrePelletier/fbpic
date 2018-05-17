@@ -40,14 +40,14 @@ from fbpic.lpa_utils.laser import add_laser_pulse, \
 # ----------
 # (See the documentation of the function propagate_pulse
 # below for their definition)
-show = False # Whether to show the plots, and check them manually
+show = True # Whether to show the plots, and check them manually
 
 use_cuda = True
 
 # Simulation box
-Nz = 50
-zmin = -10.e-6
-zmax = 10.e-6
+Nz = 200
+zmin = -30.e-6
+zmax = 30.e-6
 Nr = 25
 Lr = 40.e-6
 Nm = 2
@@ -228,12 +228,7 @@ def propagate_pulse( Nz, Nr, Nm, zmin, zmax, Lr, L_prop, zf, dt,
         w[it], A[it] = fit_fields( sim.fld, m, izref )
         # Plot the fields during the simulation
         if show==True and it%N_show == 0 :
-            import matplotlib.pyplot as plt
-            plt.clf()
-            plt.plot(sim.fld.envelope_interp[m].r,
-                (abs(sim.fld.envelope_interp[m].A)**2 ).sum(axis = 0))
-
-            plt.show()
+            show_fields(sim.fld.envelope_interp[m], 'A')
         # Advance the Maxwell equations
         sim.step( N_step, show_progress= False )
 
@@ -386,6 +381,55 @@ def fit_fields( fld, m, izref ) :
                             laser_profile, p0=np.array([w0,a0]) )
 
     return( fit_result[0] )
+
+def show_fields( grid, fieldtype ):
+    """
+    Show the field `fieldtype` on the interpolation grid
+
+    Parameters
+    ----------
+    grid: an instance of FieldInterpolationGrid
+        Contains the field on the interpolation grid for
+        on particular azimuthal mode
+
+    fieldtype : string
+        Name of the field to be plotted.
+        (either 'Er', 'Et', 'Ez', 'Br', 'Bt', 'Bz',
+        'Jr', 'Jt', 'Jz', 'rho')
+    """
+    # matplotlib only needs to be imported if this function is called
+    import matplotlib.pyplot as plt
+
+    # Select the field to plot
+    plotted_field = getattr( grid, fieldtype)
+    # Show the field also below the axis for a more realistic picture
+    plotted_field = np.hstack( (plotted_field[:,::-1],plotted_field) )
+    extent = 1.e6*np.array([grid.zmin, grid.zmax, -grid.rmax, grid.rmax])
+    plt.clf()
+    plt.suptitle('%s, for mode %d' %(fieldtype, grid.m) )
+
+    # Plot the real part
+    plt.subplot(211)
+    plt.imshow( plotted_field.real.T[::-1], aspect='auto',
+                interpolation='nearest', extent=extent )
+                #interpolation='nearest')
+    plt.xlabel('z')
+    plt.ylabel('r')
+    cb = plt.colorbar()
+    cb.set_label('Real part')
+
+    # Plot the imaginary part
+    plt.subplot(212)
+    plt.imshow( plotted_field.imag.T[::-1], aspect='auto',
+                interpolation='nearest', extent = extent )
+                #interpolation='nearest')
+    plt.xlabel('z')
+    plt.ylabel('r')
+    cb = plt.colorbar()
+    cb.set_label('Imaginary part')
+
+    plt.show()
+
 
 if __name__ == '__main__' :
 
