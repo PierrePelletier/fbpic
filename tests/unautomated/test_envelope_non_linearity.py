@@ -116,7 +116,6 @@ def show_transform( grid, fieldtype ):
     plotted_field = getattr( grid, fieldtype)
     # Show the field also below the axis for a more realistic picture
     plotted_field = np.hstack( (plotted_field[:,::-1],plotted_field) )
-    Nz = grid.Nz
     #extent = 1.e6*np.array([grid.kz[Nz//2-1,0], grid.kz[Nz//2 +1,0], grid.kr[0,0], grid.kr[-1,-1]])
     plt.clf()
     plt.suptitle('%s, for mode %d' %(fieldtype, grid.m) )
@@ -166,7 +165,6 @@ def show_coefs( grid, fieldtype, ps ):
      grid.chi_a / ps.w_transform_2
     # Show the field also below the axis for a more realistic picture
     plotted_field = np.hstack( (plotted_field[:,::-1],plotted_field) )
-    Nz = grid.Nz
     #extent = 1.e6*np.array([grid.kz[Nz//2-1,0], grid.kz[Nz//2 +1,0], grid.kr[0,0], grid.kr[-1,-1]])
     plt.clf()
     plt.suptitle('chi_a, for mode %d' %(grid.m) )
@@ -214,8 +212,6 @@ def show_coefs2( grid, fieldtype, ps ):
     # Select the field to plot
     plotted_field = 2 * ps.C_w_tot_env[:,0]
     # Show the field also below the axis for a more realistic picture
-
-    Nz = grid.Nz
     #extent = 1.e6*np.array([grid.kz[Nz//2-1,0], grid.kz[Nz//2 +1,0], grid.kr[0,0], grid.kr[-1,-1]])
     plt.clf()
     plt.suptitle('%s, for mode %d' %(fieldtype, grid.m) )

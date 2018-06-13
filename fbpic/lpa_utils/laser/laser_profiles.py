@@ -269,7 +269,7 @@ class GaussianLaser( LaserProfile ):
         # Get the transverse profile
         profile = np.exp(exp_argument) / ( diffract_factor * stretch_factor**0.5 )
         a = self.a0 * profile
-        dta = - 2 * c * (z-z0-ct) / (stretch_factor * self.inv_ctau2) \
+        dta = - 2 * c * (z-self.z0-c*t) / (stretch_factor * self.inv_ctau2) \
                                                             * self.a0 * profile
 
         return a, dta
@@ -476,7 +476,7 @@ class LaguerreGaussLaser( LaserProfile ):
             * np.cos( self.m*(theta-self.theta0) )
 
         a = self.a0 * profile
-        dta = - 2 * c * (z-z0-ct) / self.inv_ctau2 * self.a0 * profile
+        dta = - 2 * c * (z-self.z0-c*t) / self.inv_ctau2 * self.a0 * profile
 
         return a, dta
 
@@ -665,9 +665,9 @@ class DonutLikeLaguerreGaussLaser( LaserProfile ):
             * self.laguerre_pm(scaled_radius_squared)
 
         a = self.a0 * profile
-        dta = - 2 * c * (z-z0-ct) / self.inv_ctau2 * self.a0 * profile
+        dta = - 2 * c * (z-self.z0-c*t) / self.inv_ctau2 * self.a0 * profile
 
-        return a
+        return a, dta
 
 class FlattenedGaussianLaser( LaserProfile ):
     """Class that calculates a focused flattened Gaussian"""

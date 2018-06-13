@@ -509,16 +509,15 @@ class EnvelopeSpectralGrid(SpectralGrid):
 
             cuda_push_envelope_standard[dim_grid, dim_block](
                                         self.a, self.dta, self.chi_a,
+                                        ps.d_C_w_laser_env, ps.d_C_w_tot_env,
                                         ps.d_S_env_over_w, ps.w_laser,
-                                        ps.d_C_w_laser_env,
-                                        ps.d_C_w_tot_env, ps.A_coef,
-                                        ps.d_w_transform_2,
+                                        ps.A_coef, ps.d_w_transform_2,
                                         self.Nz, self.Nr )
 
         else:
             numba_push_envelope_standard(self.a, self.dta, self.chi_a,
-                                    ps.S_env_over_w, ps.w_laser,
                                     ps.C_w_laser_env, ps.C_w_tot_env,
+                                    ps.S_env_over_w, ps.w_laser,
                                     ps.A_coef, ps.w_transform_2,
                                     self.Nz, self.Nr)
 
