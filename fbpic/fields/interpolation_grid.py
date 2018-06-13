@@ -252,7 +252,7 @@ class EnvelopeInterpolationGrid(InterpolationGrid):
 
     Main attributes:
     - z,r : 1darrays containing the positions of the grid
-    - a, a_old:
+    - a, dta:
       2darrays containing the envelope amplitude.
     """
 
@@ -268,7 +268,7 @@ class EnvelopeInterpolationGrid(InterpolationGrid):
 
         # Allocate the fields arrays
         self.a = np.zeros( (Nz, Nr), dtype='complex' )
-        self.a_old = np.zeros( (Nz, Nr), dtype='complex' )
+        self.dta = np.zeros( (Nz, Nr), dtype='complex' )
         self.grad_a_r = np.zeros( (Nz, Nr), dtype='complex' )
         self.grad_a_t = np.zeros( (Nz, Nr), dtype='complex' )
         self.grad_a_z = np.zeros( (Nz, Nr), dtype='complex' )
@@ -283,7 +283,7 @@ class EnvelopeInterpolationGrid(InterpolationGrid):
         point to GPU arrays.
         """
         self.a = cuda.to_device( self.a )
-        self.a_old = cuda.to_device( self.a_old )
+        self.dta = cuda.to_device( self.dta )
         self.grad_a_r = cuda.to_device(self.grad_a_r)
         self.grad_a_t = cuda.to_device(self.grad_a_t)
         self.grad_a_z = cuda.to_device(self.grad_a_z)
@@ -298,7 +298,7 @@ class EnvelopeInterpolationGrid(InterpolationGrid):
         are accessible by the CPU again.
         """
         self.a = self.a.copy_to_host()
-        self.a_old = self.a_old.copy_to_host()
+        self.dta = self.dta.copy_to_host()
         self.grad_a_r = self.grad_a_r.copy_to_host()
         self.grad_a_t = self.grad_a_t.copy_to_host()
         self.grad_a_z = self.grad_a_z.copy_to_host()

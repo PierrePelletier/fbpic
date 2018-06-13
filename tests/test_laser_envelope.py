@@ -69,7 +69,7 @@ def test_laser_periodic(show=False):
     Test the propagation of a laser in a periodic box.
     """
     # Choose the regular timestep, not an arbitrarily long timestep
-    # (because the envelope uses a_old, which might not fit inside the window)
+    # (because the envelope uses dta, which might not fit inside the window)
     dt = (zmax-zmin)*1./c/Nz
     # Test modes up to m=1
     for m in [-1, 0, 1]:

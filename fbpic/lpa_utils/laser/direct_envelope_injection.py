@@ -40,11 +40,11 @@ def add_laser_direct_envelope( sim, laser_profile, boost ):
             "The envelope model only works for forward-propagating lasers.\n"
             "Set the `propagation_direction` argument to 1.")
 
-    # Get the local azimuthally-decomposed laser fields a and a_old on each proc
-    laser_a, laser_a_old = get_laser_a( sim, laser_profile, boost )
+    # Get the local azimuthally-decomposed laser fields a and dta on each proc
+    laser_a, laser_dta = get_laser_a( sim, laser_profile, boost )
     for m in sim.fld.envelope_mode_numbers:
         sim.fld.envelope_interp[m].a[:,:] = laser_a[:,:,m]
-        sim.fld.envelope_interp[m].a_old[:,:] = laser_a_old[:,:,m]
+        sim.fld.envelope_interp[m].dta[:,:] = laser_dta[:,:,m]
     sim.fld.compute_grad_a()
 
     print("Done.\n")
@@ -52,7 +52,7 @@ def add_laser_direct_envelope( sim, laser_profile, boost ):
 
 def get_laser_a( sim, laser_profile, boost ):
     """
-    Calculate the laser a and a_old envelope fields on the points of the interpolation
+    Calculate the laser a and dta envelope fields on the points of the interpolation
     grid of sim, and decompose into azimuthal modes.
 
     Parameters:
@@ -65,7 +65,7 @@ def get_laser_a( sim, laser_profile, boost ):
 
     Returns:
     --------
-    a_m, a_old_m: 3d_arrays of complexs
+    a_m, dta_m: 3d_arrays of complexs
         Arrays of size (Nz, Nr, 2*Nm), that represent the
         azimuthally-decomposed envelope fields of the laser. The first Nm points
         along the last axis correspond to the values in the modes m>= 0.
@@ -94,20 +94,19 @@ def get_laser_a( sim, laser_profile, boost ):
         zlab_3d = z_3d
         tlab = sim.time
 
-    # Evaluate the scalar a and a_old fields in these positions
-    a_3d = laser_profile.a_field( x_3d, y_3d, zlab_3d, tlab )
-    a_old_3d = laser_profile.a_field( x_3d, y_3d, zlab_3d, tlab - sim.dt )
+    # Evaluate the scalar a and dta fields in these positions
+    a_3d, dta_3d = laser_profile.a_field( x_3d, y_3d, zlab_3d, tlab )
 
     # For boosted-frame: scale the lab-frame value of the fields to
     # the corresponding boosted-frame value
     if boost is not None:
         scale_factor = 1./( boost.gamma0*(1+boost.beta0) )
         a_3d *= scale_factor
-        a_old_3d *= scale_factor
+        dta_3d *= scale_factor
 
     # Perform the azimuthal decomposition of the Er and Et fields
     # and add them to the mesh
     a_m_3d = np.fft.ifft(a_3d, axis=-1)
-    a_old_m_3d = np.fft.ifft(a_old_3d, axis=-1)
+    dta_m_3d = np.fft.ifft(dta_3d, axis=-1)
 
-    return( a_m_3d, a_old_m_3d )
+    return( a_m_3d, dta_m_3d )

@@ -71,11 +71,14 @@ class LaserProfile( object ):
         Returns
         -------
         a: ndarrays (adimensionnal)
-            Array of the same shape as x, y, z, containing the fields
+            Array of the same shape as x, y, z, containing the field
+
+        dta: ndarrays (seconds^-1)
+            Array of the same shape as x, y, z, containing the derivatives
         """
         # The base class only defines dummy fields
         # (This should be replaced by any class that inherits from this one.)
-        return( np.zeros_like(x) )
+        return( np.zeros_like(x), np.zeros_like(x) )
 
     def __add__( self, other ):
         """
@@ -266,7 +269,10 @@ class GaussianLaser( LaserProfile ):
         # Get the transverse profile
         profile = np.exp(exp_argument) / ( diffract_factor * stretch_factor**0.5 )
         a = self.a0 * profile
-        return a
+        dta = - 2 * c * (z-z0-ct) / (stretch_factor * self.inv_ctau2) \
+                                                            * self.a0 * profile
+
+        return a, dta
 
 
 class LaguerreGaussLaser( LaserProfile ):
@@ -470,9 +476,10 @@ class LaguerreGaussLaser( LaserProfile ):
             * np.cos( self.m*(theta-self.theta0) )
 
         a = self.a0 * profile
+        dta = - 2 * c * (z-z0-ct) / self.inv_ctau2 * self.a0 * profile
 
-        return a
-    
+        return a, dta
+
 
 class DonutLikeLaguerreGaussLaser( LaserProfile ):
     """Class that calculates a donut-like Laguerre-Gauss pulse."""
@@ -658,6 +665,7 @@ class DonutLikeLaguerreGaussLaser( LaserProfile ):
             * self.laguerre_pm(scaled_radius_squared)
 
         a = self.a0 * profile
+        dta = - 2 * c * (z-z0-ct) / self.inv_ctau2 * self.a0 * profile
 
         return a
 

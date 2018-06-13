@@ -461,7 +461,7 @@ class EnvelopeSpectralGrid(SpectralGrid):
 
     Main attributes:
     - kz,kr : 1darrays containing the positions of the grid
-    - a, a_old:
+    - a, dta:
       2darrays containing the envelope amplitude.
     """
 
@@ -478,7 +478,7 @@ class EnvelopeSpectralGrid(SpectralGrid):
                         use_cuda= use_cuda )
         Nr, Nz = self.Nr, self.Nz
         self.a  = np.zeros( (Nz, Nr), dtype='complex' )
-        self.a_old  = np.zeros( (Nz, Nr), dtype='complex' )
+        self.dta  = np.zeros( (Nz, Nr), dtype='complex' )
         self.grad_a_p  = np.zeros( (Nz, Nr), dtype='complex' )
         self.grad_a_m  = np.zeros( (Nz, Nr), dtype='complex' )
         self.grad_a_z  = np.zeros( (Nz, Nr), dtype='complex' )
@@ -488,7 +488,7 @@ class EnvelopeSpectralGrid(SpectralGrid):
     def push_envelope_with(self, ps):
 
         """
-        Push the a and a_old envelope fields over one timestep,
+        Push the a and dta envelope fields over one timestep,
         using the psatd coefficients.
 
         WARNING: currently only implemented for non-comoving simulations,
@@ -508,14 +508,16 @@ class EnvelopeSpectralGrid(SpectralGrid):
             # Push the fields on the GPU
 
             cuda_push_envelope_standard[dim_grid, dim_block](
-                                        self.a, self.a_old, self.chi_a,
+                                        self.a, self.dta, self.chi_a,
+                                        ps.d_S_env_over_w, ps.w_laser,
                                         ps.d_C_w_laser_env,
                                         ps.d_C_w_tot_env, ps.A_coef,
                                         ps.d_w_transform_2,
                                         self.Nz, self.Nr )
 
         else:
-            numba_push_envelope_standard(self.a, self.a_old, self.chi_a,
+            numba_push_envelope_standard(self.a, self.dta, self.chi_a,
+                                    ps.S_env_over_w, ps.w_laser,
                                     ps.C_w_laser_env, ps.C_w_tot_env,
                                     ps.A_coef, ps.w_transform_2,
                                     self.Nz, self.Nr)
@@ -550,7 +552,7 @@ class EnvelopeSpectralGrid(SpectralGrid):
         point to GPU arrays.
         """
         self.a = cuda.to_device( self.a )
-        self.a_old = cuda.to_device( self.a_old )
+        self.dta = cuda.to_device( self.dta )
         self.grad_a_p  = cuda.to_device( self.grad_a_p )
         self.grad_a_m  = cuda.to_device( self.grad_a_m )
         self.grad_a_z  = cuda.to_device( self.grad_a_z )
@@ -564,7 +566,7 @@ class EnvelopeSpectralGrid(SpectralGrid):
         are accessible by the CPU again.
         """
         self.a = self.a.copy_to_host()
-        self.a_old = self.a_old.copy_to_host()
+        self.dta = self.dta.copy_to_host()
         self.grad_a_p  = self.grad_a_p.copy_to_host()
         self.grad_a_m  = self.grad_a_m.copy_to_host()
         self.grad_a_z  = self.grad_a_z.copy_to_host()

@@ -79,7 +79,7 @@ def test_particles_periodic(show=False):
     Test the basic movements of particles in a periodic box.
     """
     # Choose the regular timestep, not an arbitrarily long timestep
-    # (because the envelope uses a_old, which might not fit inside the window)
+    # (because the envelope uses dta, which might not fit inside the window)
     dt = (zmax-zmin)*1./c/Nz
     # Test modes up to m=1
     for m in [0, 1]:
