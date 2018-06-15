@@ -347,6 +347,7 @@ class Simulation(object):
         self.comm.exchange_fields(fld.interp, 'E', 'replace')
         self.comm.exchange_fields(fld.interp, 'B', 'replace')
         self.comm.damp_EB_open_boundary( fld.interp )
+        self.comm.damp_a_open_boundary( fld.envelope_interp )
         fld.interp2spect('E')
         fld.interp2spect('B')
         if fld.use_envelope:
@@ -413,27 +414,6 @@ class Simulation(object):
             for ext_field in self.external_fields:
                 ext_field.apply_expression( self.ptcl, self.time )
 
-            if self.use_envelope:
-                if move_momenta:
-                    # Virtually push the particles momenta to t = n dt to obtain
-                    # the gamma used for pushing the 'a' field
-                    # Discard the changes in momentum (roll back to time (n-1/2)
-                    # dt) since this pusher is a bigger approximation
-                    for species in ptcl:
-                        species.push_p_with_envelope(self.time + 0.5 * dt,
-                                    timestep = self.dt/2, keep_momentum = False)
-                # Deposition of chi at time n dt
-                self.deposit('chi')
-                # Obtain the convolution product of chi by the envelope field
-                fld.convolve_a_chi()
-                fld.interp2spect('chi_a')
-                fld.filter_spect('chi_a')
-                # Push the envelope fields to time (n+1) dt
-                fld.push_envelope()
-                fld.spect2interp('a')
-                fld.compute_grad_a()
-
-
             # Push the particles' positions and velocities to t = (n+1/2) dt
             if move_momenta:
                 for species in ptcl:
@@ -445,14 +425,17 @@ class Simulation(object):
                     else:
                         species.push_p( self.time + 0.5*self.dt )
 
-
             if self.use_envelope:
-                # Now that the momentum has been pushed, we can gather the
-                # envelope at time (n+1/2)*dt (average of times n and n+1)
-                # to compute the gamma for pushing the positions.
-                for species in ptcl:
-                    species.gather_envelope(fld.envelope_interp, averaging = True)
-                    species.update_inv_gamma()
+                # Deposition of chi at time n dt
+                self.deposit('chi')
+                # Obtain the convolution product of chi by the envelope field
+                fld.convolve_a_chi()
+                fld.interp2spect('chi_a')
+                fld.filter_spect('chi_a')
+                # Push the envelope fields to time (n+1) dt
+                fld.push_envelope()
+                fld.spect2interp('a')
+                fld.compute_grad_a()
 
             if move_positions:
                 for species in ptcl:
@@ -524,6 +507,7 @@ class Simulation(object):
             self.comm.exchange_fields(fld.interp, 'E', 'replace')
             self.comm.exchange_fields(fld.interp, 'B', 'replace')
             self.comm.damp_EB_open_boundary( fld.interp )
+            self.comm.damp_a_open_boundary( fld.envelope_interp )
             fld.partial_interp2spect('E')
             fld.partial_interp2spect('B')
 

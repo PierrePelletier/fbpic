@@ -43,9 +43,9 @@ show = False # Whether to show the plots, and check them manually
 use_cuda = False
 
 # Simulation box
-Nz = 200
-zmin = -20.e-6
-zmax = 20.e-6
+Nz = 80
+zmin = -10.e-6
+zmax = 10.e-6
 Nr = 25
 Lr = 40.e-6
 Nm = 2
@@ -71,6 +71,7 @@ def test_laser_periodic(show=False):
     # Choose the regular timestep, not an arbitrarily long timestep
     # (because the envelope uses dta, which might not fit inside the window)
     dt = (zmax-zmin)*1./c/Nz
+    dt = L_prop*1./c/N_diag
     # Test modes up to m=1
     for m in [-1, 0, 1]:
 
@@ -262,7 +263,7 @@ def propagate_pulse( Nz, Nr, Nm, zmin, zmax, Lr, L_prop, zf, dt,
     # of w and A are close
     else:
         assert np.allclose( w, w_analytic, rtol=rtol )
-        assert np.allclose( a, a_analytic, rtol=6.e-3 )
+        assert np.allclose( a, a_analytic, rtol=10.e-3 )
         print('The simulation results agree with the theory to %e.' %rtol)
 
     # Return a dictionary of the results
@@ -437,6 +438,6 @@ def show_fields( grid, fieldtype ):
 if __name__ == '__main__' :
 
     # Run the testing function
-    #test_laser_periodic(show=show)
+    test_laser_periodic(show=show)
 
     test_laser_moving_window(show=show)

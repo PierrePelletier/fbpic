@@ -15,14 +15,14 @@ show = False # Whether to show the plots, and check them manually
 use_cuda = False
 
 # Simulation box
-Nz = 150
+Nz = 100
 zmin = -10.e-6
 zmax = 10.e-6
-Nr = 90
-rmax = 45.e-6
+Nr = 120
+rmax = 90.e-6
 n_order = -1
 # Laser pulse
-w0 = 10.e-6
+w0 = 25.e-6
 k0 = 2*np.pi/0.8e-6
 kp = k0 / 20
 ctau = np.sqrt(2)/kp
@@ -115,7 +115,7 @@ def show_transform( grid, fieldtype ):
     # Select the field to plot
     plotted_field = getattr( grid, fieldtype)
     # Show the field also below the axis for a more realistic picture
-    plotted_field = np.hstack( (plotted_field[:,::-1],plotted_field) )
+    #plotted_field = np.hstack( (plotted_field[:,::-1],plotted_field) )
     #extent = 1.e6*np.array([grid.kz[Nz//2-1,0], grid.kz[Nz//2 +1,0], grid.kr[0,0], grid.kr[-1,-1]])
     plt.clf()
     plt.suptitle('%s, for mode %d' %(fieldtype, grid.m) )
@@ -139,96 +139,11 @@ def show_transform( grid, fieldtype ):
     plt.ylabel('r')
     cb = plt.colorbar()
     cb.set_label('Imaginary part')
-
-    plt.show()
-
-def show_coefs( grid, fieldtype, ps ):
-    """
-    Show the field `fieldtype` on the interpolation grid
-
-    Parameters
-    ----------
-    grid: an instance of FieldInterpolationGrid
-        Contains the field on the interpolation grid for
-        on particular azimuthal mode
-
-    fieldtype : string
-        Name of the field to be plotted.
-        (either 'Er', 'Et', 'Ez', 'Br', 'Bt', 'Bz',
-        'Jr', 'Jt', 'Jz', 'rho')
-    """
-    # matplotlib only needs to be imported if this function is called
-    import matplotlib.pyplot as plt
-
-    # Select the field to plot
-    plotted_field = 2 * (ps.C_w_laser_env - ps.C_w_tot_env) * \
-     grid.chi_a / ps.w_transform_2
-    # Show the field also below the axis for a more realistic picture
-    plotted_field = np.hstack( (plotted_field[:,::-1],plotted_field) )
-    #extent = 1.e6*np.array([grid.kz[Nz//2-1,0], grid.kz[Nz//2 +1,0], grid.kr[0,0], grid.kr[-1,-1]])
-    plt.clf()
-    plt.suptitle('chi_a, for mode %d' %(grid.m) )
-
-    # Plot the real part
-    plt.subplot(211)
-    plt.imshow( plotted_field.real.T[::-1], aspect='auto',
-                #interpolation='nearest', extent=extent )
-                interpolation='nearest')
-    plt.xlabel('z')
-    plt.ylabel('r')
-    cb = plt.colorbar()
-    cb.set_label('Real part')
-
-    # Plot the imaginary part
-    plt.subplot(212)
-    plt.imshow( plotted_field.imag.T[::-1], aspect='auto',
-                #interpolation='nearest', extent = extent )
-                interpolation='nearest')
-    plt.xlabel('z')
-    plt.ylabel('r')
-    cb = plt.colorbar()
-    cb.set_label('Imaginary part')
-
-    plt.show()
-
-def show_coefs2( grid, fieldtype, ps ):
-    """
-    Show the field `fieldtype` on the interpolation grid
-
-    Parameters
-    ----------
-    grid: an instance of FieldInterpolationGrid
-        Contains the field on the interpolation grid for
-        on particular azimuthal mode
-
-    fieldtype : string
-        Name of the field to be plotted.
-        (either 'Er', 'Et', 'Ez', 'Br', 'Bt', 'Bz',
-        'Jr', 'Jt', 'Jz', 'rho')
-    """
-    # matplotlib only needs to be imported if this function is called
-    import matplotlib.pyplot as plt
-
-    # Select the field to plot
-    plotted_field = 2 * ps.C_w_tot_env[:,0]
-    # Show the field also below the axis for a more realistic picture
-    #extent = 1.e6*np.array([grid.kz[Nz//2-1,0], grid.kz[Nz//2 +1,0], grid.kr[0,0], grid.kr[-1,-1]])
-    plt.clf()
-    plt.suptitle('%s, for mode %d' %(fieldtype, grid.m) )
-
-    # Plot the real part
-    plt.subplot(211)
-    plt.plot(grid.kz[:,0], plotted_field)
-    plt.xlabel('z')
-    plt.ylabel('r')
 
     plt.show()
 
 Nm = 1
 dt = (zmax-zmin)*1./c/Nz
-print(c*dt)
-print(L_prop)
-print(L_prop / c / dt)
 
 
 sim = Simulation( Nz, zmax, Nr, rmax, Nm, dt,
@@ -238,7 +153,6 @@ sim = Simulation( Nz, zmax, Nr, rmax, Nm, dt,
     use_cuda=use_cuda, use_envelope=True )
 
 sim.set_moving_window(v=c)
-print("A_COEF", sim.fld.psatd[0].A_coef)
 tau = ctau/c
 lambda0 = 2*np.pi/k0
 # Create the relevant laser profile
@@ -253,15 +167,21 @@ add_laser_pulse( sim, profile, method = 'direct_envelope' )
 
 Ntot_step_init = int( round( L_prop/(c*dt) ) )
 k_iter = 100
+"""kz = sim.fld.envelope_spect[0].kz
 show_fields(sim.fld.envelope_interp[0], 'a')
 
 show_transform(sim.fld.envelope_spect[0], 'a')
 show_coefs(sim.fld.envelope_spect[0], 'a', sim.fld.psatd[0])
-show_coefs2(sim.fld.envelope_spect[0], 'a', sim.fld.psatd[0])
+#show_coefs2(sim.fld.envelope_spect[0], 'a', sim.fld.psatd[0])
+import matplotlib.pyplot as plt
+plt.plot(kz, sim.fld.psatd[0].C_w_tot_env[:,0])
+plt.show()
+plt.plot(kz, sim.fld.psatd[0].w_tot[:,0])
+plt.show()
+print(c * k0 * dt)
+plt.plot(kz,  c * k0 * sim.fld.psatd[0].S_env_over_w[:,0])
+plt.show()"""
 for it in range(k_iter):
     sim.step( Ntot_step_init//k_iter, show_progress= True )
     show_fields(sim.fld.envelope_interp[0], 'a')
     show_transform(sim.fld.envelope_spect[0], 'a')
-
-    show_coefs(sim.fld.envelope_spect[0], 'a', sim.fld.psatd[0])
-    show_coefs2(sim.fld.envelope_spect[0], 'a', sim.fld.psatd[0])

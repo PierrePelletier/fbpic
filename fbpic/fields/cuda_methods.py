@@ -504,4 +504,4 @@ def cuda_convolve(chi_a, chi, a):
     iz, ir = cuda.grid(2)
 
     if (iz < chi.shape[0]) and (ir < chi.shape[1]):
-        chi_a[iz, ir] += chi[iz, ir] * a[iz, ir]
+        chi_a[iz, ir] += chi[iz, ir] * (a[iz, ir] + 0.5 * dt * dta[iz, ir])

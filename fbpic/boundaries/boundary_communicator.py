@@ -761,6 +761,55 @@ class BoundaryCommunicator(object):
                         interp[m].Bt[-nd:,:]*=self.right_damp[::-1,np.newaxis]
                         interp[m].Bz[-nd:,:]*=self.right_damp[::-1,np.newaxis]
 
+    def damp_a_open_boundary( self, envelope_interp ):
+        """
+        Damp the fields E and B in the damp cells, at the right and left
+        of the *global* simulation box.
+
+        Parameter:
+        -----------
+        envelope_interp: list of EnvelopeInterpolationGrid objects
+            (one per azimuthal mode)
+            Objects that contain the fields to be damped.
+        """
+        # Do not damp the fields for 0 n_damp cells (periodic)
+        if self.n_damp != 0:
+            if self.left_proc is None:
+                # Damp the fields on the CPU or the GPU
+                if envelope_interp[0].use_cuda:
+                    # Damp the fields on the GPU
+                    dim_grid, dim_block = cuda_tpb_bpg_2d(
+                        self.n_guard+self.n_damp, envelope_interp[0].Nr )
+                    for m in range(len(envelope_interp)):
+                        cuda_damp_a_left[dim_grid, dim_block](
+                            envelope_interp[m].a, envelope_interp[m].dta,
+                            self.d_left_damp, self.n_guard, self.n_damp)
+                else:
+                    # Damp the fields on the CPU
+                    nd = self.n_guard + self.n_damp
+                    for m in range(len(envelope_interp)):
+                        # Damp the fields in left guard cells
+                        envelope_interp[m].a[:nd,:]*=self.left_damp[:,np.newaxis]
+                        envelope_interp[m].dta[:nd,:]*=self.left_damp[:,np.newaxis]
+
+            if self.right_proc is None:
+                # Damp the fields on the CPU or the GPU
+                if envelope_interp[0].use_cuda:
+                    # Damp the fields on the GPU
+                    dim_grid, dim_block = cuda_tpb_bpg_2d(
+                        self.n_guard+self.n_damp, envelope_interp[0].Nr )
+                    for m in range(len(envelope_interp)):
+                        cuda_damp_a_right[dim_grid, dim_block](
+                            envelope_interp[m].a, envelope_interp[m].dta,
+                            self.d_right_damp, self.n_guard, self.n_damp)
+                else:
+                    # Damp the fields on the CPU
+                    nd = self.n_guard + self.n_damp
+                    for m in range(len(envelope_interp)):
+                        # Damp the fields in left guard cells
+                        envelope_interp[m].a[-nd:,:]*=self.right_damp[::-1,np.newaxis]
+                        envelope_interp[m].dta[-nd:,:]*=self.right_damp[::-1,np.newaxis]
+
     def generate_damp_array( self, n_guard, n_damp ):
         """
         Create a 1d damping array of length n_guard.

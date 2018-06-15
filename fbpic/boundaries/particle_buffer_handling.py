@@ -175,6 +175,7 @@ def remove_particles_cpu(species, fld, n_guard, left_proc, right_proc):
         species.grad_a2_x = species.grad_a2_x[selec_stay]
         species.grad_a2_y = species.grad_a2_y[selec_stay]
         species.grad_a2_z = species.grad_a2_z[selec_stay]
+        species.a2_delayed = species.a2_delayed[selec_stay]
     if species.tracker is not None:
         species.tracker.id = species.tracker.id[selec_stay]
     if species.ionizer is not None:
@@ -281,6 +282,10 @@ def remove_particles_gpu(species, fld, n_guard, left_proc, right_proc):
                     (species,'inv_gamma'), (species,'w') ]
     if species.ionizer is not None:
         attr_list.append( (species.ionizer,'w_times_level') )
+    if species.use_envelope:
+        attr_list.append( (species,'a2'), (species,'grad_a2_x'),
+                (species,'grad_a2_y'), (species,'grad_a2_z'),
+                (species,'a2_delayed'))
     # Loop through the float attributes
     for i_attr in range(n_float):
         # Initialize 3 buffer arrays on the GPU (need to be initialized
@@ -390,6 +395,7 @@ def add_buffers_to_particles( species, float_recv_left, float_recv_right,
             species.grad_a2_x = cuda.device_array( shape, dtype=np.float64 )
             species.grad_a2_y = cuda.device_array( shape, dtype=np.float64 )
             species.grad_a2_z = cuda.device_array( shape, dtype=np.float64 )
+            species.a2_delayed = cuda.device_array( shape, dtype=np.float64 )
     else:
         # Reallocate empty field-on-particle arrays on the CPU
         species.Ex = np.empty(species.Ntot, dtype=np.float64)
@@ -403,7 +409,7 @@ def add_buffers_to_particles( species, float_recv_left, float_recv_right,
             species.grad_a2_x = np.empty(species.Ntot, dtype=np.float64)
             species.grad_a2_y = np.empty(species.Ntot, dtype=np.float64)
             species.grad_a2_z = np.empty(species.Ntot, dtype=np.float64)
-
+            species.a2_delayed = np.empty(species.Ntot, dtype=np.float64)
     # The particles are unsorted after adding new particles.
     species.sorted = False
 

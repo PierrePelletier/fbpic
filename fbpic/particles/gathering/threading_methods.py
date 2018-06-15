@@ -200,10 +200,10 @@ def gather_field_numba_linear(x, y, z,
 @numba.njit
 def gather_envelope_field_numba_linear(x, y, z,
                     invdz, zmin, Nz,
-                    invdr, rmin, Nr,
-                    a_tuple,
-                    grad_a_r_tuple, grad_a_t_tuple, grad_a_z_tuple, m_tuple,
-                    a2, grad_a2_x, grad_a2_y, grad_a2_z,
+                    invdr, rmin, Nr, dt,
+                    a_tuple, grad_a_r_tuple, grad_a_t_tuple, grad_a_z_tuple,
+                    dta_tuple, m_tuple,
+                    a2, grad_a2_x, grad_a2_y, grad_a2_z, a2_delayed,
                     averaging = False):
     """
     Gathering of the fields a and grad_a using numba with multi-threading.
@@ -317,40 +317,49 @@ def gather_envelope_field_numba_linear(x, y, z,
         Fr = 0.
         Ft = 0.
         Fz = 0.
+        dtF = 0.
         for it in range(len(m_tuple)):
             m = m_tuple[it]
             a_m = a_tuple[it]
             grad_a_r_m = grad_a_r_tuple[it]
             grad_a_t_m = grad_a_t_tuple[it]
             grad_a_z_m = grad_a_z_tuple[it]
+            dta_m = dta_tuple[it]
             exptheta_m = (cos - 1.j*sin)**m
             # Add contribution from mode m
-            F, Fr, Ft, Fz = add_linear_envelope_gather_for_mode( m, F, Fr, Ft,
-                                Fz, exptheta_m, a_m, grad_a_r_m, grad_a_t_m,
-                                grad_a_z_m, iz_lower, iz_upper, ir_lower,
+            F, Fr, Ft, Fz, dtF = add_linear_envelope_gather_for_mode( m, F, Fr,
+                                Ft, Fz, dtF, exptheta_m,
+                                a_m, grad_a_r_m, grad_a_t_m, grad_a_z_m, dta_m,
+                                iz_lower, iz_upper, ir_lower,
                                 ir_upper, S_ll, S_lu, S_lg, S_ul, S_uu, S_ug )
 
         # Convert to Cartesian coordinates
         Fx = cos*Fr - sin*Ft
         Fy = sin*Fr + cos*Ft
 
+        # Obtain the a field at time n+1/2
+        dtF = 0.5 * dt * dtF + F
+
         # Convert to grad_a^2 and a^2
         Fx = 2 * (Fx * F.conjugate() ).real
         Fy = 2 * (Fy * F.conjugate() ).real
         Fz = 2 * (Fz * F.conjugate() ).real
         F = F * F.conjugate()
+        dtF = dtF * dtF.conjugate()
 
         # Register in the particle arrays
         if averaging:
             a2[i] = (0.5 * (a2[i] + F)).real
-            #grad_a2_x[i] = (0.5 * (grad_a2_x[i] + Fx)).real
-            #grad_a2_y[i] = (0.5 * (grad_a2_y[i] + Fy)).real
-            #grad_a2_z[i] = (0.5 * (grad_a2_z[i] + Fz)).real
+            grad_a2_x[i] = (0.5 * (grad_a2_x[i] + Fx)).real
+            grad_a2_y[i] = (0.5 * (grad_a2_y[i] + Fy)).real
+            grad_a2_z[i] = (0.5 * (grad_a2_z[i] + Fz)).real
+            a2_delayed[i] = (0.5 * (a2_delayed[i] + F)).real
         else:
             a2[i] = F.real
             grad_a2_x[i] = Fx.real
             grad_a2_y[i] = Fy.real
             grad_a2_z[i] = Fz.real
+            a2_delayed[i] = dtF.real
 
 
 # -----------------------
@@ -515,10 +524,10 @@ def gather_field_numba_cubic(x, y, z,
 @numba.njit
 def gather_envelope_field_numba_cubic(x, y, z,
                     invdz, zmin, Nz,
-                    invdr, rmin, Nr,
-                    a_tuple,
-                    grad_a_r_tuple, grad_a_t_tuple, grad_a_z_tuple, m_tuple,
-                    a2, grad_a2_x, grad_a2_y, grad_a2_z,
+                    invdr, rmin, Nr, dt,
+                    a_tuple, grad_a_r_tuple, grad_a_t_tuple, grad_a_z_tuple,
+                    dta_tuple, m_tuple,
+                    a2, grad_a2_x, grad_a2_y, grad_a2_z, a2_delayed,
                     nthreads, ptcl_chunk_indices, averaging = False):
     """
     Gathering of the envelope fields a2 and grad_a2 using numba
@@ -613,26 +622,33 @@ def gather_envelope_field_numba_cubic(x, y, z,
             Fr = 0.
             Ft = 0.
             Fz = 0.
+            dtF = 0.
             for m in m_tuple:
                 # Add contribution from mode m
                 a_m = a_tuple[m]
                 grad_a_r_m = grad_a_r_tuple[m]
                 grad_a_t_m = grad_a_t_tuple[m]
                 grad_a_z_m = grad_a_z_tuple[m]
+                dta_m = dta_tuple[m]
                 exptheta_m = (cos - 1.j*sin)**m
-                F, Fr, Ft, Fz = add_cubic_envelope_gather_for_mode( m, F, Fr,
-                            Ft, Fz, exptheta_m, a_m, grad_a_r_m, grad_a_t_m,
-                            grad_a_z_m, ir_lowest, iz_lowest, Sr, Sz, Nr, Nz  )
+                F, Fr, Ft, Fz, dtF = add_cubic_envelope_gather_for_mode( m, F,
+                            Fr, Ft, Fz, dtF, exptheta_m, a_m, grad_a_r_m,
+                            grad_a_t_m, grad_a_z_m, dta_m,
+                            ir_lowest, iz_lowest, Sr, Sz, Nr, Nz  )
 
             # Convert to Cartesian coordinates
             Fx = cos*Fr - sin*Ft
             Fy = sin*Fr + cos*Ft
+
+            # Obtain the a field at time n+1/2
+            dtF = 0.5 * dt * dtF + F
 
             # Convert to grad_a^2 and a^2
             Fx = 2 * (Fx * F.conjugate() ).real
             Fy = 2 * (Fy * F.conjugate() ).real
             Fz = 2 * (Fz * F.conjugate() ).real
             F = F * F.conjugate()
+            dtF = dtF * dtF.conjugate()
 
             # Register in the particle arrays
             if averaging:
@@ -640,8 +656,10 @@ def gather_envelope_field_numba_cubic(x, y, z,
                 grad_a2_x[i] = (0.5 * (grad_a2_x[i] + Fx)).real
                 grad_a2_y[i] = (0.5 * (grad_a2_y[i] + Fy)).real
                 grad_a2_z[i] = (0.5 * (grad_a2_z[i] + Fz)).real
+                a2_delayed[i] = (0.5 * (a2_delayed[i] + F)).real
             else:
                 a2[i] = F.real
                 grad_a2_x[i] = Fx.real
                 grad_a2_y[i] = Fy.real
                 grad_a2_z[i] = Fz.real
+                a2_delayed[i] = dtF.real

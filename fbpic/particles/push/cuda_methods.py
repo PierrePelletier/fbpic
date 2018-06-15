@@ -213,7 +213,7 @@ def push_p_ioniz_gpu( ux, uy, uz, inv_gamma,
 @cuda.jit
 def push_p_envelope_gpu( ux, uy, uz, inv_gamma,
                 Ex, Ey, Ez, Bx, By, Bz, a2, grad_a2_x, grad_a2_y, grad_a2_z,
-                q, m, Ntot, dt , keep_momentum = True) :
+                a2_delayed, q, m, Ntot, dt , keep_momentum = True) :
     """
     Advance the particles' momenta, using cuda on the GPU
 
@@ -267,19 +267,19 @@ def push_p_envelope_gpu( ux, uy, uz, inv_gamma,
             ux[ip], uy[ip], uz[ip], inv_gamma[ip] = push_p_vay_envelope(
                 ux[ip], uy[ip], uz[ip], inv_gamma[ip],
                 Ex[ip], Ey[ip], Ez[ip], Bx[ip], By[ip], Bz[ip], a2[ip],
-                grad_a2_x[ip], grad_a2_y[ip], grad_a2_z[ip], econst, bconst,
-                aconst, scale_factor)
+                grad_a2_x[ip], grad_a2_y[ip], grad_a2_z[ip], a2_delayed[ip],
+                econst, bconst, aconst, scale_factor)
         else:
             _, _, _, inv_gamma[ip] = push_p_vay_envelope(
                 ux[ip], uy[ip], uz[ip], inv_gamma[ip],
                 Ex[ip], Ey[ip], Ez[ip], Bx[ip], By[ip], Bz[ip], a2[ip],
-                grad_a2_x[ip], grad_a2_y[ip], grad_a2_z[ip], econst, bconst,
-                aconst, scale_factor)
+                grad_a2_x[ip], grad_a2_y[ip], grad_a2_z[ip], a2_delayed[ip],
+                econst, bconst, aconst, scale_factor)
 
 @cuda.jit
 def push_p_after_plane_envelope_gpu( z, z_plane, ux, uy, uz, inv_gamma,
                 Ex, Ey, Ez, Bx, By, Bz, a2, grad_a2_x, grad_a2_y, grad_a2_z,
-                q, m, Ntot, dt , keep_momentum = True ) :
+                a2_delayed, q, m, Ntot, dt , keep_momentum = True ) :
     """
     Advance the particles' momenta, using cuda on the GPU.
     Only the particles that are located beyond the plane z=z_plane
@@ -310,20 +310,20 @@ def push_p_after_plane_envelope_gpu( z, z_plane, ux, uy, uz, inv_gamma,
             ux[ip], uy[ip], uz[ip], inv_gamma[ip] = push_p_vay_envelope(
                 ux[ip], uy[ip], uz[ip], inv_gamma[ip],
                 Ex[ip], Ey[ip], Ez[ip], Bx[ip], By[ip], Bz[ip], a2[ip],
-                grad_a2_x[ip], grad_a2_y[ip], grad_a2_z[ip], econst, bconst,
-                aconst, scale_factor)
+                grad_a2_x[ip], grad_a2_y[ip], grad_a2_z[ip], a2_delayed[ip],
+                econst, bconst, aconst, scale_factor)
         else:
             _, _, _, inv_gamma[ip] = push_p_vay_envelope(
                 ux[ip], uy[ip], uz[ip], inv_gamma[ip],
                 Ex[ip], Ey[ip], Ez[ip], Bx[ip], By[ip], Bz[ip], a2[ip],
-                grad_a2_x[ip], grad_a2_y[ip], grad_a2_z[ip], econst, bconst,
-                aconst, scale_factor)
+                grad_a2_x[ip], grad_a2_y[ip], grad_a2_z[ip], a2_delayed[ip],
+                econst, bconst, aconst, scale_factor)
 
 
 @cuda.jit
 def push_p_ioniz_envelope_gpu( ux, uy, uz, inv_gamma,
                 Ex, Ey, Ez, Bx, By, Bz, a2, grad_a2_x, grad_a2_y, grad_a2_z,
-                m, Ntot, dt, ionization_level, keep_momentum = True ) :
+                a2_delayed,m, Ntot, dt, ionization_level, keep_momentum = True):
     """
     Advance the particles' momenta, using numba on the GPU
     This take into account that the particles are ionizable, and thus
@@ -353,20 +353,20 @@ def push_p_ioniz_envelope_gpu( ux, uy, uz, inv_gamma,
                 ux[ip], uy[ip], uz[ip], inv_gamma[ip] = push_p_vay_envelope(
                     ux[ip], uy[ip], uz[ip], inv_gamma[ip],
                     Ex[ip], Ey[ip], Ez[ip], Bx[ip], By[ip], Bz[ip], a2[ip],
-                    grad_a2_x[ip], grad_a2_y[ip], grad_a2_z[ip], econst, bconst,
-                    aconst, scale_factor)
+                    grad_a2_x[ip], grad_a2_y[ip], grad_a2_z[ip], a2_delayed[ip],
+                    econst, bconst, aconst, scale_factor)
             else:
                 _, _, _, inv_gamma[ip] = push_p_vay_envelope(
                     ux[ip], uy[ip], uz[ip], inv_gamma[ip],
                     Ex[ip], Ey[ip], Ez[ip], Bx[ip], By[ip], Bz[ip], a2[ip],
-                    grad_a2_x[ip], grad_a2_y[ip], grad_a2_z[ip], econst, bconst,
-                    aconst, scale_factor)
+                    grad_a2_x[ip], grad_a2_y[ip], grad_a2_z[ip], a2_delayed[ip],
+                    econst, bconst, aconst, scale_factor)
 
 
 @cuda.jit(device=True, inline=True)
 def push_p_vay_envelope( ux_i, uy_i, uz_i, inv_gamma_i,
     Ex, Ey, Ez, Bx, By, Bz, a2_i, grad_a2_x_i, grad_a2_y_i, grad_a2_z_i,
-    econst, bconst, aconst, scale_factor ):
+    a2_delayed_i, econst, bconst, aconst, scale_factor ):
     """
     Push at single macroparticle, using the Vay pusher
     """
@@ -415,11 +415,14 @@ def push_p_vay_envelope( ux_i, uy_i, uz_i, inv_gamma_i,
     uy_f = s*( uyp + ty*ut + uzp*tx - uxp*tz )
     uz_f = s*( uzp + tz*ut + uxp*ty - uyp*tx )
 
+    inv_gamma_f = 1. / math.sqrt(1 + ux_f**2 + uy_f**2 + uz_f**2 + \
+                                                    scale_factor * a2_delayed_i)
+
     ux_f -= aconst * inv_gamma_f * grad_a2_x_i
     uy_f -= aconst * inv_gamma_f * grad_a2_y_i
     uz_f -= aconst * inv_gamma_f * grad_a2_z_i
 
-    inv_gamma_f = 1. / math.sqrt(1 + ux_f**2 + uy_f**2 + uz_f**2 + scale_factor * a2_i)
+
 
     return( ux_f, uy_f, uz_f, inv_gamma_f )
 

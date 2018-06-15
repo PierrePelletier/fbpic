@@ -786,7 +786,6 @@ class Fields(object) :
         Obtain the product chi * a in the different azimuthal modes instead
         of only chi and replace chi in the InterpolationGrid by this product
         """
-
         for m in self.envelope_mode_numbers:
             for i in range(-self.Nm +1 + max(m,0), self.Nm + min(m, 0)):
                 if self.use_cuda :
@@ -795,10 +794,12 @@ class Fields(object) :
                     cuda_convolve[dim_grid, dim_block](
                         self.envelope_interp[m].chi_a,
                         self.envelope_interp[i].chi,
-                        self.envelope_interp[m-i].a)
+                        self.envelope_interp[m-i].a,
+                        self.envelope_interp[m-i].dta, self.dt)
 
                 else:
                     # Compute the new grad_a on CPU
                     numba_convolve(self.envelope_interp[m].chi_a,
                         self.envelope_interp[i].chi,
-                        self.envelope_interp[m-i].a)
+                        self.envelope_interp[m-i].a,
+                        self.envelope_interp[m-i].dta, self.dt)

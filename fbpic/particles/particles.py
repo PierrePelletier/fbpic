@@ -18,8 +18,7 @@ from .injection import BallisticBeforePlane, ContinuousInjector, \
 from .push.numba_methods import push_p_numba, push_p_ioniz_numba, \
                             push_p_after_plane_numba, push_x_numba,\
                             push_p_envelope_numba, push_p_ioniz_envelope_numba,\
-                            push_p_after_plane_envelope_numba,\
-                            update_inv_gamma_numba
+                            push_p_after_plane_envelope_numba
 from .gathering.threading_methods import gather_field_numba_linear, \
         gather_field_numba_cubic, gather_envelope_field_numba_linear, \
         gather_envelope_field_numba_cubic
@@ -39,7 +38,7 @@ if cuda_installed:
     from .push.cuda_methods import push_p_gpu, push_p_ioniz_gpu, \
                         push_p_after_plane_gpu, push_x_gpu,\
                         push_p_envelope_gpu, push_p_ioniz_envelope_gpu, \
-                        push_p_after_plane_envelope_gpu, update_inv_gamma_gpu
+                        push_p_after_plane_envelope_gpu
     from .deposition.cuda_methods import deposit_rho_gpu_linear, \
         deposit_J_gpu_linear, deposit_rho_gpu_cubic, deposit_J_gpu_cubic, \
         deposit_chi_gpu_cubic, deposit_chi_gpu_linear
@@ -193,6 +192,7 @@ class Particles(object) :
             self.grad_a2_z = np.zeros( Ntot )
             self.grad_a2_x = np.zeros( Ntot )
             self.grad_a2_y = np.zeros( Ntot )
+            self.a2_delayed = np.zeros( Ntot )
 
 
 
@@ -271,6 +271,7 @@ class Particles(object) :
                 self.grad_a2_z = cuda.to_device( self.grad_a2_z )
                 self.grad_a2_x = cuda.to_device( self.grad_a2_x )
                 self.grad_a2_y = cuda.to_device( self.grad_a2_y )
+                self.a2_delayed = cuda.to_device( self.a2_delayed )
 
             # Copy arrays on the GPU for the sorting
             self.cell_idx = cuda.to_device(self.cell_idx)
@@ -317,6 +318,7 @@ class Particles(object) :
                 self.grad_a2_z = self.grad_a2_z.copy_to_host()
                 self.grad_a2_x = self.grad_a2_x.copy_to_host()
                 self.grad_a2_y = self.grad_a2_y.copy_to_host()
+                self.a2_delayed = self.a2_delayed.copy_to_host()
 
             # Copy arrays on the CPU
             # that represent the sorting arrays
@@ -672,6 +674,7 @@ class Particles(object) :
                     self.Ex, self.Ey, self.Ez,
                     self.Bx, self.By, self.Bz,
                     self.a2, self.grad_a2_x, self.grad_a2_y, self.grad_a2_z,
+                    self.a2_delayed,
                     self.m, self.Ntot, timestep, self.ionizer.ionization_level,
                     keep_momentum = keep_momentum )
             elif z_plane is not None:
@@ -683,6 +686,7 @@ class Particles(object) :
                     self.Ex, self.Ey, self.Ez,
                     self.Bx, self.By, self.Bz,
                     self.a2, self.grad_a2_x, self.grad_a2_y, self.grad_a2_z,
+                    self.a2_delayed,
                     self.q, self.m, self.Ntot, timestep,
                     keep_momentum = keep_momentum )
             else:
@@ -692,6 +696,7 @@ class Particles(object) :
                     self.Ex, self.Ey, self.Ez,
                     self.Bx, self.By, self.Bz,
                     self.a2, self.grad_a2_x, self.grad_a2_y, self.grad_a2_z,
+                    self.a2_delayed,
                     self.q, self.m, self.Ntot, timestep,
                     keep_momentum = keep_momentum)
 
@@ -703,6 +708,7 @@ class Particles(object) :
                 push_p_ioniz_envelope_numba(self.ux, self.uy, self.uz, self.inv_gamma,
                     self.Ex, self.Ey, self.Ez, self.Bx, self.By, self.Bz,
                     self.a2, self.grad_a2_x, self.grad_a2_y, self.grad_a2_z,
+                    self.a2_delayed,
                     self.m, self.Ntot, timestep, self.ionizer.ionization_level,
                     keep_momentum = keep_momentum )
             elif z_plane is not None:
@@ -714,6 +720,7 @@ class Particles(object) :
                     self.Ex, self.Ey, self.Ez,
                     self.Bx, self.By, self.Bz,
                     self.a2, self.grad_a2_x, self.grad_a2_y, self.grad_a2_z,
+                    self.a2_delayed,
                     self.q, self.m, self.Ntot, timestep,
                     keep_momentum = keep_momentum )
             else:
@@ -721,23 +728,9 @@ class Particles(object) :
                 push_p_envelope_numba(self.ux, self.uy, self.uz, self.inv_gamma,
                     self.Ex, self.Ey, self.Ez, self.Bx, self.By, self.Bz,
                     self.a2, self.grad_a2_x, self.grad_a2_y, self.grad_a2_z,
+                    self.a2_delayed,
                     self.q, self.m, self.Ntot, timestep,
                     keep_momentum = keep_momentum )
-
-    def update_inv_gamma(self):
-
-        # GPU (CUDA) version
-        if self.use_cuda:
-            # Get the threads per block and the blocks per grid
-            dim_grid_1d, dim_block_1d = cuda_tpb_bpg_1d( self.Ntot )
-            # Call the CUDA Kernel
-            update_inv_gamma_gpu[dim_grid_1d, dim_block_1d](
-                                self.a2, self.ux, self.uy, self.uz,
-                                self.inv_gamma, self.q, self.m)
-        # CPU version
-        else:
-            update_inv_gamma_numba( self.a2, self.ux, self.uy, self.uz,
-                                    self.inv_gamma, self.q, self.m, self.Ntot)
 
     def push_x( self, dt, x_push=1., y_push=1., z_push=1. ) :
         """
@@ -956,6 +949,7 @@ class Particles(object) :
         grad_a_r_tuple = tuple(envelope_grid[m].grad_a_r for m in envelope_mode_numbers)
         grad_a_t_tuple = tuple(envelope_grid[m].grad_a_t for m in envelope_mode_numbers)
         grad_a_z_tuple = tuple(envelope_grid[m].grad_a_z for m in envelope_mode_numbers)
+        dta_tuple = tuple(envelope_grid[m].dta for m in envelope_mode_numbers)
         m_tuple = tuple(envelope_mode_numbers)
 
         # GPU (CUDA) version
@@ -969,10 +963,10 @@ class Particles(object) :
                     self.x, self.y, self.z,
                     envelope_grid[0].invdz, envelope_grid[0].zmin,
                     envelope_grid[0].Nz, envelope_grid[0].invdr,
-                    envelope_grid[0].rmin, envelope_grid[0].Nr,
+                    envelope_grid[0].rmin, envelope_grid[0].Nr, self.dt,
                     a_tuple,grad_a_r_tuple, grad_a_t_tuple, grad_a_z_tuple,
-                    m_tuple, self.a2,
-                    self.grad_a2_x, self.grad_a2_y, self.grad_a2_z,
+                    dta_tuple, m_tuple, self.a2, self.grad_a2_x,
+                    self.grad_a2_y, self.grad_a2_z, self.a2_delayed,
                     averaging = averaging )
             elif self.particle_shape == 'cubic':
                 gather_envelope_field_gpu_cubic[
@@ -980,10 +974,10 @@ class Particles(object) :
                     self.x, self.y, self.z,
                     envelope_grid[0].invdz, envelope_grid[0].zmin,
                     envelope_grid[0].Nz, envelope_grid[0].invdr,
-                    envelope_grid[0].rmin, envelope_grid[0].Nr,
+                    envelope_grid[0].rmin, envelope_grid[0].Nr, self.dt,
                     a_tuple,grad_a_r_tuple, grad_a_t_tuple, grad_a_z_tuple,
-                    m_tuple, self.a2,
-                    self.grad_a2_x, self.grad_a2_y, self.grad_a2_z,
+                    dta_tuple, m_tuple, self.a2, self.grad_a2_x,
+                    self.grad_a2_y, self.grad_a2_z, self.a2_delayed,
                     averaging = averaging )
         else:
             if self.particle_shape == 'linear':
@@ -991,10 +985,10 @@ class Particles(object) :
                     self.x, self.y, self.z,
                     envelope_grid[0].invdz, envelope_grid[0].zmin,
                     envelope_grid[0].Nz, envelope_grid[0].invdr,
-                    envelope_grid[0].rmin, envelope_grid[0].Nr,
+                    envelope_grid[0].rmin, envelope_grid[0].Nr, self.dt,
                     a_tuple,grad_a_r_tuple, grad_a_t_tuple, grad_a_z_tuple,
-                    m_tuple, self.a2,
-                    self.grad_a2_x, self.grad_a2_y, self.grad_a2_z,
+                    dta_tuple, m_tuple, self.a2, self.grad_a2_x,
+                    self.grad_a2_y, self.grad_a2_z, self.a2_delayed,
                     averaging = averaging )
             elif self.particle_shape == 'cubic':
                 # Divide particles into chunks (each chunk is handled by a
@@ -1004,10 +998,10 @@ class Particles(object) :
                     self.x, self.y, self.z,
                     envelope_grid[0].invdz, envelope_grid[0].zmin,
                     envelope_grid[0].Nz, envelope_grid[0].invdr,
-                    envelope_grid[0].rmin, envelope_grid[0].Nr,
+                    envelope_grid[0].rmin, envelope_grid[0].Nr, self.dt,
                     a_tuple,grad_a_r_tuple, grad_a_t_tuple, grad_a_z_tuple,
-                    m_tuple, self.a2,
-                    self.grad_a2_x, self.grad_a2_y, self.grad_a2_z,
+                    dta_tuple, m_tuple, self.a2, self.grad_a2_x,
+                    self.grad_a2_y, self.grad_a2_z, self.a2_delayed,
                     nthreads, ptcl_chunk_indices,
                     averaging = averaging )
 

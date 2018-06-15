@@ -185,7 +185,7 @@ Ntot_step = int( round( L_prop_in_plasma/(c*dt) ) )
 N_step = int( round( Ntot_step/N_diag ) )
 z_list = []
 for it in range(N_diag):
-    sim.step( N_step, show_progress= False )
+    sim.step( N_step, show_progress= True )
     print("ITERATION", it)
     #show_fields(sim.fld.envelope_interp[0], 'a')
     Nz = sim.fld.envelope_interp[0].Nz

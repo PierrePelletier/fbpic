@@ -90,7 +90,7 @@ def add_linear_gather_for_mode( m,
     return(Fr, Ft, Fz)
 
 def add_linear_envelope_gather_for_mode( m, F,
-    Fr, Ft, Fz, exptheta_m, F_grid, Fr_grid, Ft_grid, Fz_grid,
+    Fr, Ft, Fz, dtF, exptheta_m, F_grid, Fr_grid, Ft_grid, Fz_grid, dtF_grid,
     iz_lower, iz_upper, ir_lower, ir_upper,
     S_ll, S_lu, S_lg, S_ul, S_uu, S_ug ):
     """
@@ -138,26 +138,31 @@ def add_linear_envelope_gather_for_mode( m, F,
     Fr_m = 0.j
     Ft_m = 0.j
     Fz_m = 0.j
+    dtF_m = 0.j
     # Lower cell in z, Lower cell in r
     F_m += S_ll * F_grid[ iz_lower, ir_lower ]
     Fr_m += S_ll * Fr_grid[ iz_lower, ir_lower ]
     Ft_m += S_ll * Ft_grid[ iz_lower, ir_lower ]
     Fz_m += S_ll * Fz_grid[ iz_lower, ir_lower ]
+    dtF_m += S_ll * dtF_grid[ iz_lower, ir_lower ]
     # Lower cell in z, Upper cell in r
     F_m += S_lu * F_grid[ iz_lower, ir_upper ]
     Fr_m += S_lu * Fr_grid[ iz_lower, ir_upper ]
     Ft_m += S_lu * Ft_grid[ iz_lower, ir_upper ]
     Fz_m += S_lu * Fz_grid[ iz_lower, ir_upper ]
+    dtF_m += S_lu * dtF_grid[ iz_lower, ir_upper ]
     # Upper cell in z, Lower cell in r
     F_m += S_ul * F_grid[ iz_upper, ir_lower ]
     Fr_m += S_ul * Fr_grid[ iz_upper, ir_lower ]
     Ft_m += S_ul * Ft_grid[ iz_upper, ir_lower ]
     Fz_m += S_ul * Fz_grid[ iz_upper, ir_lower ]
+    dtF_m += S_ul * dtF_grid[ iz_upper, ir_lower ]
     # Upper cell in z, Upper cell in r
     F_m += S_uu * F_grid[ iz_upper, ir_upper ]
     Fr_m += S_uu * Fr_grid[ iz_upper, ir_upper ]
     Ft_m += S_uu * Ft_grid[ iz_upper, ir_upper ]
     Fz_m += S_uu * Fz_grid[ iz_upper, ir_upper ]
+    dtF_m += S_uu * dtF_grid[ iz_upper, ir_upper ]
     # Add the fields from the guard cells
     if ir_lower == ir_upper == 0:
         flip_factor = (-1.)**m
@@ -166,18 +171,21 @@ def add_linear_envelope_gather_for_mode( m, F,
         Fr_m += -flip_factor * S_lg * Fr_grid[ iz_lower, 0]
         Ft_m += -flip_factor * S_lg * Ft_grid[ iz_lower, 0]
         Fz_m +=  flip_factor * S_lg * Fz_grid[ iz_lower, 0]
+        dtF_m += -flip_factor * S_lg * dtF_grid[ iz_lower, 0]
         # Upper cell in z
         F_m += -flip_factor * S_ug * F_grid[ iz_upper, 0]
         Fr_m += -flip_factor * S_ug * Fr_grid[ iz_upper, 0]
         Ft_m += -flip_factor * S_ug * Ft_grid[ iz_upper, 0]
         Fz_m +=  flip_factor * S_ug * Fz_grid[ iz_upper, 0]
+        dtF_m += -flip_factor * S_ug * dtF_grid[ iz_upper, 0]
     # Add the contribution from mode m to Fr, Ft, Fz
     F += F_m * exptheta_m
     Fr += Fr_m*exptheta_m
     Ft += Ft_m*exptheta_m
     Fz += Fz_m*exptheta_m
+    dtF += dtF_m * exptheta_m
 
-    return(F, Fr, Ft, Fz)
+    return(F, Fr, Ft, Fz, dtF)
 
 
 def add_cubic_gather_for_mode( m,
@@ -279,7 +287,7 @@ def add_cubic_gather_for_mode( m,
 
 
 def add_cubic_envelope_gather_for_mode( m, F,
-    Fr, Ft, Fz, exptheta_m, F_grid, Fr_grid, Ft_grid, Fz_grid,
+    Fr, Ft, Fz, dtF, exptheta_m, F_grid, Fr_grid, Ft_grid, Fz_grid, dtF_grid,
     ir_lowest, iz_lowest, Sr_arr, Sz_arr, Nr, Nz ):
     """
     Add the contribution of the gathered scalar field and vector field
@@ -326,6 +334,7 @@ def add_cubic_envelope_gather_for_mode( m, F,
     Fr_m = 0.j
     Ft_m = 0.j
     Fz_m = 0.j
+    dtF_m = 0.j
 
     # Loop over the 4x4 cells from which to gather fields
     for index_r in range(4):
@@ -362,6 +371,7 @@ def add_cubic_envelope_gather_for_mode( m, F,
             Fr_m += Sz*Sr_perp*Fr_grid[iz, ir]
             Ft_m += Sz*Sr_perp*Ft_grid[iz, ir]
             Fz_m += Sz*Sr_long*Fz_grid[iz, ir]
+            dtF_m += Sz*Sr_perp*dtF_grid[iz, ir]
 
     # Add the contribution from mode m to Fr, Ft, Fz
     # (Take into account factor 2 in the definition of azimuthal modes)
@@ -370,5 +380,6 @@ def add_cubic_envelope_gather_for_mode( m, F,
     Fr += Fr_m*exptheta_m
     Ft += Ft_m*exptheta_m
     Fz += Fz_m*exptheta_m
+    dtF += dtF_m*exptheta_m
 
-    return(F, Fr, Ft, Fz)
+    return(F, Fr, Ft, Fz, dtF)

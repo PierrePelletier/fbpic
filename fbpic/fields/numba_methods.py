@@ -157,23 +157,22 @@ def numba_push_envelope_standard(a, dta, chi_a, C_w_laser_env, C_w_tot_env,
             # Store the field that will be dta
             a_temp = a[iz, ir]
             # Push the envelope
-            a[iz, ir] = A_coef * ( (C_w_tot_env[iz, ir] - 1j * w_laser *\
-                                     S_env_over_w[iz, ir] ) * a_temp  \
-                            + S_env_over_w[iz, ir] * dta[iz, ir] ) \
-                        + (A_coef * (C_w_tot_env[iz, ir] - 1j * w_laser \
+            """a[iz, ir] = A_coef * (S_env_over_w[iz, ir] * dta[iz, ir]\
+                     + (C_w_tot_env[iz, ir] - 1j * w_laser * S_env_over_w[iz, ir]) \
+                     * a[iz, ir])
+            dta[iz, ir] = A_coef * ( (C_w_tot_env[iz, ir] + 1j * w_laser \
+                        * S_env_over_w[iz, ir])  * dta[iz, ir] \
+                        - w_transform_2[iz, ir] * S_env_over_w[iz, ir] * a_temp )"""
+            a[iz, ir] = A_coef * ( S_env_over_w[iz, ir] * dta[iz, ir] \
+                            + (C_w_tot_env[iz, ir] - 1j * w_laser *\
+                                                     S_env_over_w[iz, ir] ) * a_temp  )\
+            +  ( (A_coef * (C_w_tot_env[iz, ir] - 1j * w_laser \
                         *  S_env_over_w[iz, ir] ) - 1) \
-                        * chi_a[iz, ir] / w_transform_2[iz, ir]
+                        * chi_a[iz, ir] ) / w_transform_2[iz, ir]
             dta[iz, ir] = A_coef * ((C_w_tot_env[iz, ir] + 1j * w_laser \
                                 * S_env_over_w[iz, ir] ) * dta[iz, ir] \
-                            + S_env_over_w[iz, ir] * ( w_transform_2[iz, ir]\
+                            - S_env_over_w[iz, ir] * ( w_transform_2[iz, ir]\
                              * a_temp + chi_a[iz, ir]) )
-            """a[iz, ir] = A_coef * ( (C_w_tot_env[iz, ir] - 1j * dta[iz,ir] \
-                    + 2 * C_w_tot_env[iz, ir] * a[iz, ir] \
-                    - 2 * (C_w_laser_env - C_w_tot_env[iz, ir]) * \
-                     chi_a[iz, ir] / w_transform_2[iz, ir] )
-            dta[iz, ir] = a_temp
-            """
-
 
     return
 
@@ -397,8 +396,8 @@ def reduce_slice( reduced_array, iz, global_array, iz_global, m ):
         reduced_array[iz, Nr-1] += global_array[it, m, iz_global, Nr+3]
 
 @njit_parallel
-def numba_convolve( chi_a, chi, a):
+def numba_convolve( chi_a, chi, a, dta, dt):
     Nz, Nr = chi_a.shape
     for iz in prange(Nz):
         for ir in range(Nr):
-            chi_a[iz, ir] += chi[iz, ir] * a[iz, ir]
+            chi_a[iz, ir] += chi[iz, ir] * (a[iz, ir] + 0.5 * dt * dta[iz, ir])
